@@ -6,9 +6,9 @@ import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-final class Parser implements FragmentHandler {
+public class Parser implements FragmentHandler {
 
-  Parser() {
+  public Parser() {
   }
 
   @Override

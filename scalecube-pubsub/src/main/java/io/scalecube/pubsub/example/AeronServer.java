@@ -47,7 +47,7 @@ public class AeronServer {
     this.buffer = new UnsafeBuffer(BufferUtil.allocateDirectAligned(2048, 16));
     
     // frame handler and decoder:
-    this.fragmentAssembler = new FragmentAssembler(new Parser());
+    this.fragmentAssembler = builder.fragmentAssembler;
   }
 
   private static String serverMessage() {
@@ -57,6 +57,7 @@ public class AeronServer {
 
   public static class Builder {
 
+    public FragmentAssembler fragmentAssembler;
     public String aeronDirectoryName = "/dev/shm/aeron-server";
     int dataPort = 9091;
     int controlPort = 9090;
@@ -82,6 +83,11 @@ public class AeronServer {
       AeronServer server = new AeronServer(this);
       server.start();
       return server;
+    }
+
+    public Builder fragmentAssembler(FragmentAssembler fragmentAssembler) {
+      this.fragmentAssembler = fragmentAssembler;
+      return this;
     }
   }
 
@@ -112,7 +118,6 @@ public class AeronServer {
         this.log.trace("pub connected: {}", Boolean.valueOf(pub.isConnected()));
         if (pub.isConnected()) {
           Utilities.send(this.log, pub, this.buffer, serverMessage());
-          System.out.println("1");
         }
 
         this.log.trace("sub connected: {}", Boolean.valueOf(sub.isConnected()));
@@ -130,12 +135,12 @@ public class AeronServer {
   }
 
   private void onImageUnavailable(final Image image) {
-    this.log.debug("onImageUnavailable: [0x{}] {}", String.format("%08x", Integer.valueOf(image.sessionId())),
+    System.out.println("onImageUnavailable: " + String.format("%08x", Integer.valueOf(image.sessionId())) +
         image.sourceIdentity());
   }
 
   private void onImageAvailable(final Image image) {
-    this.log.debug("onImageAvailable: [0x{}] {}", String.format("%08x", Integer.valueOf(image.sessionId())),
+    System.out.println("onImageAvailable: " + String.format("%08x", Integer.valueOf(image.sessionId())) +
         image.sourceIdentity());
   }
 }

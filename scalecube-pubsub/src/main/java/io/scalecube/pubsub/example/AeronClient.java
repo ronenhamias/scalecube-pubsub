@@ -11,6 +11,7 @@ import io.aeron.Publication;
 import io.aeron.Subscription;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.MediaDriver.Context;
+import io.scalecube.pubsub.example.AeronServer.Builder;
 import org.agrona.BufferUtil;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -53,7 +54,7 @@ public class AeronClient {
     this.aeron = Aeron.connect(this.aeronContext);
 
     this.buffer = new UnsafeBuffer(BufferUtil.allocateDirectAligned(2048, 16));
-    this.fragmentAssembler = new FragmentAssembler(new Parser());
+    this.fragmentAssembler = builder.fragmentAssembler;
 
   }
 
@@ -135,6 +136,7 @@ public class AeronClient {
     public String serverAddress = "localhost";
     public int localPort = 8080;
     public String localAddress = "localhost";
+    private FragmentAssembler fragmentAssembler;
 
     public AeronClient start(Builder builder) {
       return new AeronClient(this);
@@ -171,5 +173,9 @@ public class AeronClient {
       return client;
     }
 
+    public Builder fragmentAssembler(FragmentAssembler fragmentAssembler) {
+      this.fragmentAssembler = fragmentAssembler;
+      return this;
+    }
   }
 }
