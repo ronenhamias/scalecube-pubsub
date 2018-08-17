@@ -27,6 +27,7 @@ public class AeronServer {
   private final String localAddress;
   private final int localControlPort;
   private final int localDataPort;
+  private String aeronDirectoryName;
 
   public AeronServer(Builder builder) {
 
@@ -35,14 +36,17 @@ public class AeronServer {
     this.localAddress = builder.address;
     this.localControlPort = builder.controlPort;
     this.localDataPort = builder.dataPort;
-
-    this.mediaContext = new MediaDriver.Context().dirDeleteOnStart(true).aeronDirectoryName("/dev/shm/aeron-server");
+    this.aeronDirectoryName = builder.aeronDirectoryName;
+    
+    this.mediaContext = new MediaDriver.Context().dirDeleteOnStart(true).aeronDirectoryName(this.aeronDirectoryName);
     this.media = MediaDriver.launch(this.mediaContext);
 
-    this.aeronContext = new Aeron.Context().aeronDirectoryName("/dev/shm/aeron-server");
+    this.aeronContext = new Aeron.Context().aeronDirectoryName(this.aeronDirectoryName);
     this.aeron = Aeron.connect(this.aeronContext);
 
     this.buffer = new UnsafeBuffer(BufferUtil.allocateDirectAligned(2048, 16));
+    
+    // frame handler and decoder:
     this.fragmentAssembler = new FragmentAssembler(new Parser());
   }
 
@@ -53,6 +57,7 @@ public class AeronServer {
 
   public static class Builder {
 
+    public String aeronDirectoryName = "/dev/shm/aeron-server";
     int dataPort = 9091;
     int controlPort = 9090;
     String address = "localhost";

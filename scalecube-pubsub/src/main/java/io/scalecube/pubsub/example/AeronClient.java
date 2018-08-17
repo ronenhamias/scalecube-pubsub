@@ -34,6 +34,7 @@ public class AeronClient {
   private Aeron aeron;
   private UnsafeBuffer buffer;
   private FragmentAssembler fragmentAssembler;
+  private String aeronDirectoryName;
 
   public AeronClient(Builder builder) {
 
@@ -42,17 +43,18 @@ public class AeronClient {
     this.serverAddress = builder.serverAddress;
     this.serverControlPort = builder.serverControlPort;
     this.serverDataPort = builder.serverDataPort;
+    this.aeronDirectoryName = builder.aeronDirectoryName;
 
     this.mediaContext =
-        new MediaDriver.Context().dirDeleteOnStart(true).aeronDirectoryName("/dev/shm/aeron-client-" + localPort);
+        new MediaDriver.Context().dirDeleteOnStart(true).aeronDirectoryName(this.aeronDirectoryName + localPort);
     this.media = MediaDriver.launch(this.mediaContext);
 
-    this.aeronContext = new Aeron.Context().aeronDirectoryName("/dev/shm/aeron-client-" + localPort);
+    this.aeronContext = new Aeron.Context().aeronDirectoryName(this.aeronDirectoryName + localPort);
     this.aeron = Aeron.connect(this.aeronContext);
 
     this.buffer = new UnsafeBuffer(BufferUtil.allocateDirectAligned(2048, 16));
     this.fragmentAssembler = new FragmentAssembler(new Parser());
-    
+
   }
 
   public void start() {
@@ -127,6 +129,7 @@ public class AeronClient {
   }
 
   static public class Builder {
+    public String aeronDirectoryName = "/dev/shm/aeron-client-";
     public int serverDataPort = 9091;
     public int serverControlPort = 9090;
     public String serverAddress = "localhost";

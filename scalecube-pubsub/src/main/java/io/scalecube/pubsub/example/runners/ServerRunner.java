@@ -5,7 +5,7 @@ import io.scalecube.pubsub.example.AeronServer;
 public class ServerRunner {
 
   public static void main(String[] args) {
-    final AeronServer s = AeronServer.builder().start();
+    AeronServer.builder().start();
   }
 
 }
