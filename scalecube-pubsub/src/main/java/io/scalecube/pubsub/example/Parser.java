@@ -7,10 +7,8 @@ import org.slf4j.Logger;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 final class Parser implements FragmentHandler {
-  private final Logger log;
 
-  Parser(final Logger log) {
-    this.log = log;
+  Parser() {
   }
 
   @Override
