@@ -10,15 +10,15 @@ public final class Utilities {
 
   }
 
-  static void send(final Logger log, final Publication pub, final MutableDirectBuffer buffer, final String message) {
-    log.debug("sending: {} to {}", message, pub.channel());
+  static void send(final Publication pub, final MutableDirectBuffer buffer, final String message) {
+    System.out.println("sending: " +  message + " to " + pub.channel());
 
     final byte[] value = message.getBytes(UTF_8);
     buffer.putBytes(0, value);
     final long result = pub.offer(buffer, 0, value.length);
 
     if (result < 0L) {
-      log.error("could not send: {}", Long.valueOf(result));
+      System.out.println("could not send: " + Long.valueOf(result));
     }
   }
 }

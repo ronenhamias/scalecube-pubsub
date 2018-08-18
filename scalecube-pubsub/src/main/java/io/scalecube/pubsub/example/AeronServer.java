@@ -1,5 +1,6 @@
 package io.scalecube.pubsub.example;
 
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 import io.aeron.Aeron;
 import io.aeron.ChannelUriStringBuilder;
 import io.aeron.ExclusivePublication;
@@ -7,14 +8,13 @@ import io.aeron.FragmentAssembler;
 import io.aeron.Image;
 import io.aeron.Subscription;
 import io.aeron.driver.MediaDriver;
+import java.time.LocalDateTime;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.agrona.BufferUtil;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.time.LocalDateTime;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
 public class AeronServer {
   private final Logger log;
@@ -37,7 +37,7 @@ public class AeronServer {
     this.localControlPort = builder.controlPort;
     this.localDataPort = builder.dataPort;
     this.aeronDirectoryName = builder.aeronDirectoryName;
-    
+
     this.mediaContext = new MediaDriver.Context().dirDeleteOnStart(true).aeronDirectoryName(this.aeronDirectoryName);
     this.media = MediaDriver.launch(this.mediaContext);
 
@@ -45,7 +45,7 @@ public class AeronServer {
     this.aeron = Aeron.connect(this.aeronContext);
 
     this.buffer = new UnsafeBuffer(BufferUtil.allocateDirectAligned(2048, 16));
-    
+
     // frame handler and decoder:
     this.fragmentAssembler = builder.fragmentAssembler;
   }
@@ -58,7 +58,7 @@ public class AeronServer {
   public static class Builder {
 
     public FragmentAssembler fragmentAssembler;
-    public String aeronDirectoryName = "/dev/shm/aeron-server";
+    public String aeronDirectoryName = "/dev/sc/aeron-server";
     int dataPort = 9091;
     int controlPort = 9090;
     String address = "localhost";
@@ -117,7 +117,7 @@ public class AeronServer {
       while (true) {
         this.log.trace("pub connected: {}", Boolean.valueOf(pub.isConnected()));
         if (pub.isConnected()) {
-          Utilities.send(this.log, pub, this.buffer, serverMessage());
+          Utilities.send(pub, this.buffer, serverMessage());
         }
 
         this.log.trace("sub connected: {}", Boolean.valueOf(sub.isConnected()));
@@ -135,12 +135,12 @@ public class AeronServer {
   }
 
   private void onImageUnavailable(final Image image) {
-    System.out.println("onImageUnavailable: " + String.format("%08x", Integer.valueOf(image.sessionId())) +
-        image.sourceIdentity());
+    System.out.println(
+        "onImageUnavailable: " + String.format("%08x", Integer.valueOf(image.sessionId())) + image.sourceIdentity());
   }
 
   private void onImageAvailable(final Image image) {
-    System.out.println("onImageAvailable: " + String.format("%08x", Integer.valueOf(image.sessionId())) +
-        image.sourceIdentity());
+    System.out.println(
+        "onImageAvailable: " + String.format("%08x", Integer.valueOf(image.sessionId())) + image.sourceIdentity());
   }
 }

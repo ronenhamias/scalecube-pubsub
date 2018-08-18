@@ -1,25 +1,16 @@
 package io.scalecube.pubsub.example;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 import io.aeron.Aeron;
 import io.aeron.ChannelUriStringBuilder;
-import io.aeron.ExclusivePublication;
 import io.aeron.FragmentAssembler;
 import io.aeron.Image;
 import io.aeron.Publication;
 import io.aeron.Subscription;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.MediaDriver.Context;
-import io.scalecube.pubsub.example.AeronServer.Builder;
-import org.agrona.BufferUtil;
-import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.time.LocalDateTime;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import reactor.ipc.aeron.ControlMessageSubscriber;
+import reactor.ipc.aeron.DataMessageSubscriber;
 
 public class AeronClient {
 
@@ -33,9 +24,12 @@ public class AeronClient {
   private MediaDriver media;
   private Aeron.Context aeronContext;
   private Aeron aeron;
-  private UnsafeBuffer buffer;
+
   private FragmentAssembler fragmentAssembler;
   private String aeronDirectoryName;
+  private AeronEventLoop pooler;
+  private ControlMessageSubscriber controlSubscriber;
+  private DataMessageSubscriber dataSubscriber;
 
   public AeronClient(Builder builder) {
 
@@ -45,20 +39,24 @@ public class AeronClient {
     this.serverControlPort = builder.serverControlPort;
     this.serverDataPort = builder.serverDataPort;
     this.aeronDirectoryName = builder.aeronDirectoryName;
-
+    this.controlSubscriber = builder.controlMessageSubscriber;
     this.mediaContext =
         new MediaDriver.Context().dirDeleteOnStart(true).aeronDirectoryName(this.aeronDirectoryName + localPort);
     this.media = MediaDriver.launch(this.mediaContext);
 
     this.aeronContext = new Aeron.Context().aeronDirectoryName(this.aeronDirectoryName + localPort);
     this.aeron = Aeron.connect(this.aeronContext);
-
-    this.buffer = new UnsafeBuffer(BufferUtil.allocateDirectAligned(2048, 16));
     this.fragmentAssembler = builder.fragmentAssembler;
-
   }
 
   public void start() {
+    this.pooler = new AeronEventLoop("aeron-event-loop");
+    this.addControlSubscription(this.controlSubscriber);
+    this.addDataSubscription(this.dataSubscriber);
+    this.pooler.initialise();
+  }
+
+  public void addControlSubscription(ControlMessageSubscriber controlMessageSubscriber) {
     /*
      * Create a subscription to read data from the server. This uses dynamic MDC to will send messages
      * to the server's control port, and the server will react by data to the local address and port
@@ -68,46 +66,34 @@ public class AeronClient {
         .endpoint(this.localAddress + ":" + this.localPort)
         .controlEndpoint(this.serverAddress + ":" + this.serverControlPort).controlMode("dynamic").build();
 
-    final Subscription sub =
+    /**
+     * create control subscription.
+     */
+    final Subscription controlSubscription =
         this.aeron.addSubscription(sub_uri, Shared.STREAM_ID, this::onImageAvailable, this::onImageUnavailable);
 
-    /*
-     * Create a publication for sending data to the server.
-     */
-    final String pub_uri = new ChannelUriStringBuilder().mtu(Shared.MTU).reliable(Boolean.TRUE).media("udp")
-        .endpoint(this.serverAddress + ":" + this.serverDataPort).build();
+    this.pooler.addControlSubscription(controlSubscription, controlMessageSubscriber);
 
-    final ExclusivePublication pub = this.aeron.addExclusivePublication(pub_uri, Shared.STREAM_ID);
-
-    ExecutorService service = Executors.newSingleThreadExecutor();
-    service.execute(() -> {
-      while (true) {
-        if (sub.isConnected()) {
-          sub.poll(this.fragmentAssembler, 10);
-        }
-
-        if (pub.isConnected()) {
-          send(pub, this.buffer, clientMessage());
-        }
-
-        try {
-          Thread.sleep(2000L);
-        } catch (final InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    });
   }
 
-  static void send(final Publication pub, final MutableDirectBuffer buffer, final String message) {
+  public void addDataSubscription(DataMessageSubscriber dataMessageSubscriber) {
+    /*
+     * Create a subscription to read data from the server. This uses dynamic MDC to will send messages
+     * to the server's control port, and the server will react by data to the local address and port
+     * combination specified here.
+     */
+    final String sub_uri = new ChannelUriStringBuilder().mtu(Shared.MTU).reliable(Boolean.TRUE).media("udp")
+        .endpoint(this.localAddress + ":" + this.localPort)
+        .controlEndpoint(this.serverAddress + ":" + this.serverDataPort).controlMode("dynamic").build();
 
-    final byte[] value = message.getBytes(UTF_8);
-    buffer.putBytes(0, value);
-    final long result = pub.offer(buffer, 0, value.length);
+    /**
+     * create control subscription.
+     */
+    final Subscription controlSubscription =
+        this.aeron.addSubscription(sub_uri, Shared.STREAM_ID, this::onImageAvailable, this::onImageUnavailable);
 
-    if (result < 0L) {
-      // log.error("could not send: {}", Long.valueOf(result));
-    }
+    this.pooler.addDataSubscription(controlSubscription, dataMessageSubscriber);
+
   }
 
   private void onImageUnavailable(final Image image) {
@@ -120,23 +106,19 @@ public class AeronClient {
         "onImageAvailable: " + String.format("%08x", Integer.valueOf(image.sessionId())) + image.sourceIdentity());
   }
 
-  private String clientMessage() {
-    return new StringBuilder(128).append("Client HELLO: ").append(LocalDateTime.now().format(ISO_LOCAL_DATE_TIME))
-        .toString();
-  }
-
   static public Builder builder() {
     return new Builder();
   }
 
   static public class Builder {
-    public String aeronDirectoryName = "/dev/shm/aeron-client-";
+    public String aeronDirectoryName = "/dev/sc/aeron-client-";
     public int serverDataPort = 9091;
     public int serverControlPort = 9090;
     public String serverAddress = "localhost";
     public int localPort = 8080;
     public String localAddress = "localhost";
     private FragmentAssembler fragmentAssembler;
+    private ControlMessageSubscriber controlMessageSubscriber;
 
     public AeronClient start(Builder builder) {
       return new AeronClient(this);
@@ -177,5 +159,41 @@ public class AeronClient {
       this.fragmentAssembler = fragmentAssembler;
       return this;
     }
+
+    public Builder addControlSubscription(ControlMessageSubscriber controlMessageSubscriber) {
+      this.controlMessageSubscriber = controlMessageSubscriber;
+      return this;
+    }
   }
+
+  public class PublicationBuilder {
+    private Aeron aeron;
+    private int streamId = Shared.STREAM_ID;
+    private String endpoint;
+
+    ChannelUriStringBuilder channel =
+        new ChannelUriStringBuilder().mtu(Shared.MTU).reliable(Boolean.TRUE).media("udp").endpoint(endpoint);
+
+
+    private PublicationBuilder(Aeron aeron, String endpoint) {
+      this.aeron = aeron;
+      this.endpoint = endpoint;
+    }
+
+    public Publication build() {
+      return this.aeron.addExclusivePublication(channel.build(), streamId);
+    }
+  }
+
+  /*
+   * Create a publication for sending data to the server.
+   */
+  public PublicationBuilder publication() {
+    return new PublicationBuilder(this.aeron, this.serverAddress + ":" + this.serverDataPort);
+  }
+
+  public void send(Publication pub, UnsafeBuffer buffer, String clientMessage) {
+    Utilities.send(pub, buffer, clientMessage);
+  }
+
 }
