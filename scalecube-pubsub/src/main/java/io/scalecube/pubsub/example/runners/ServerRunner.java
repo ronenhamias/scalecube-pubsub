@@ -8,7 +8,7 @@ public class ServerRunner {
 
   public static void main(String[] args) {
     AeronServer.builder()
-      .fragmentAssembler(new FragmentAssembler(new Parser())).start();
+      .fragmentAssembler(new FragmentAssembler(new Parser("server"))).start();
   }
 
 }

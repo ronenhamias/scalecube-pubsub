@@ -147,15 +147,15 @@ public class AeronEventLoop implements Runnable {
       this(subscription, new ControlPoolerFragmentHandler(subscriber), subscriber);
     }
 
-    InnerPooler(Subscription subscription, DataMessageSubscriber subscriber ) {
+    InnerPooler(Subscription subscription, DataMessageSubscriber subscriber) {
       this(subscription, new DataPoolerFragmentHandler(subscriber), subscriber);
     }
 
     private InnerPooler(Subscription subscription, FragmentHandler handler, PoolerSubscriber subscriber) {
       this.subscription = subscription;
       this.handler = new FragmentAssembler(handler);
-
-      subscriber.onSubscribe(this);
+      if (subscriber != null)
+        subscriber.onSubscribe(this);
     }
 
     int poll() {

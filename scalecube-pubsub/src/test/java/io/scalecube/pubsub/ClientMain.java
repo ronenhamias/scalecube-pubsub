@@ -8,7 +8,7 @@ public class ClientMain {
     
     PubSub pubsub = PubSub.create();
     
-    Mono<TopicSubscriber> sub1 = pubsub.client("1","224.0.1.1", 40456, 13002);
+    Mono<TopicSubscriber> sub1 = pubsub.client("1","224.0.1.1", 40456, 13001);
     
     sub1.subscribe(x -> x.listen().subscribe(msg -> {
       System.out.println("1: " + msg);
